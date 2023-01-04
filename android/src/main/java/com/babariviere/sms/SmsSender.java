@@ -4,11 +4,13 @@ import android.Manifest;
 import android.annotation.TargetApi;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.provider.Telephony;
 import android.telephony.SmsManager;
+import android.telephony.SubscriptionManager;
 import android.util.Log;
 
 import com.babariviere.sms.permisions.Permissions;
@@ -16,6 +18,7 @@ import com.babariviere.sms.permisions.Permissions;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.UUID;
 
 import io.flutter.plugin.common.MethodCall;
@@ -94,18 +97,49 @@ class SmsSenderMethodHandler implements RequestPermissionsResultListener {
                 deliveredIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT
         );
-        SmsManager sms;
-        if (this.subId == null) {
-            sms = SmsManager.getDefault();
-        } else {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-                sms = SmsManager.getSmsManagerForSubscriptionId(this.subId);
-            } else {
-                result.error("#03", "this version of android does not support multicard SIM", null);
-                return;
+//        SmsManager sms;
+//        if (this.subId == null) {
+//            sms = SmsManager.getDefault();
+//        } else {
+//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+//                sms = SmsManager.getSmsManagerForSubscriptionId(this.subId);
+//            } else {
+//                result.error("#03", "this version of android does not support multicard SIM", null);
+//                return;
+//            }
+//        }
+//        sms.sendTextMessage(address, null, body, sentPendingIntent, deliveredPendingIntent);
+
+        //sang's code
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1)//
+        {
+            ArrayList<PendingIntent> sentIntentList = new ArrayList<>();
+            sentIntentList.add(sentPendingIntent);
+
+            ArrayList<PendingIntent> deliveredIntentList = new ArrayList<>();
+            deliveredIntentList.add(deliveredPendingIntent);
+
+            ArrayList<String> messageList = SmsManager.getDefault().divideMessage(body);
+            SubscriptionManager localSubscriptionManager = (SubscriptionManager) registrar.context().getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
+
+            if (localSubscriptionManager.getActiveSubscriptionInfoCount() > 1)
+            {
+                // int simIndex = 0;
+                // List<SubscriptionInfo> localList = localSubscriptionManager.getActiveSubscriptionInfoList();
+                // SubscriptionInfo simInfo = localList.get(simIndex);
+                SmsManager
+                        // .getSmsManagerForSubscriptionId(simInfo.getSubscriptionId())
+                        .getSmsManagerForSubscriptionId(this.subId)
+                        .sendMultipartTextMessage(address, null, messageList, sentIntentList, deliveredIntentList);
+
+            }//
+            else
+            {
+                SmsManager sms = SmsManager.getDefault();
+                sms.sendMultipartTextMessage(address, null, messageList, sentIntentList, deliveredIntentList);
             }
         }
-        sms.sendTextMessage(address, null, body, sentPendingIntent, deliveredPendingIntent);
         result.success(null);
     }
 }
